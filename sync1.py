@@ -43,16 +43,7 @@ class SyncWorker(Model):
         b_fc1 = tf.compat.v1.assign(self.b_fc1, vars[5])
         w_fc2 = tf.compat.v1.assign(self.w_fc2, vars[6])
         b_fc2 = tf.compat.v1.assign(self.b_fc2, vars[7])
-        '''
-        w_conv1 = tf.assign(self.w_conv1, vars[0])
-        b_conv1 = tf.assign(self.b_conv1, vars[1])
-        w_conv2 = tf.assign(self.w_conv2, vars[2])
-        b_conv2 = tf.assign(self.b_conv2, vars[3])
-        w_fc1 = tf.assign(self.w_fc1, vars[4])
-        b_fc1 = tf.assign(self.b_fc1, vars[5])
-        w_fc2 = tf.assign(self.w_fc2, vars[6])
-        b_fc2 = tf.assign(self.b_fc2, vars[7])
-        '''
+
         self.sess.run([
             w_conv1, b_conv1,
             w_conv2, b_conv2,
@@ -137,24 +128,6 @@ if __name__ == "__main__":
     
     p = Model()
     
-    '''
-    bcast_conv1_w = 0
-    bcast_conv1_b = 0
-    bcast_conv2_w = 0
-    bcast_conv2_b = 0
-    bcast_fc1_w = 0
-    bcast_fc1_b = 0
-    bcast_fc2_w = 0
-    bcast_fc2_b = 0
-    '''
-
-    '''
-    # Mapping variables
-    vars = [
-        bcast_conv1_w, bcast_conv1_b, bcast_conv2_w, bcast_conv2_b,
-        bcast_fc1_w, bcast_fc1_b, bcast_fc2_w, bcast_fc2_b
-    ]
-    '''
     vars = [
         p.bcast_conv1_w, p.bcast_conv1_b, p.bcast_conv2_w, p.bcast_conv2_b,
         p.bcast_fc1_w, p.bcast_fc1_b, p.bcast_fc2_w, p.bcast_fc2_b
