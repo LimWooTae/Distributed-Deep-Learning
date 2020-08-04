@@ -74,27 +74,9 @@ class Model:
             
             # Data1
             self.d1 = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
-            
-            self.d1_conv1_gw = np.empty(self.w_conv1.shape, dtype=np.float32)
-            self.d1_conv1_gb = np.empty(self.b_conv1.shape, dtype=np.float32)
-            self.d1_conv2_gw = np.empty(self.w_conv2.shape, dtype=np.float32)
-            self.d1_conv2_gb = np.empty(self.b_conv2.shape, dtype=np.float32)
-            self.d1_fc1_gw = np.empty(self.w_fc1.shape, dtype=np.float32)
-            self.d1_fc1_gb = np.empty(self.b_fc1.shape, dtype=np.float32)
-            self.d1_fc2_gw = np.empty(self.w_fc2.shape, dtype=np.float32)
-            self.d1_fc2_gb = np.empty(self.b_fc2.shape, dtype=np.float32)
-
+    
             # Data2
             self.d2 = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
-            
-            self.d2_conv1_gw = np.empty(self.w_conv1.shape, dtype=np.float32)
-            self.d2_conv1_gb = np.empty(self.b_conv1.shape, dtype=np.float32)
-            self.d2_conv2_gw = np.empty(self.w_conv2.shape, dtype=np.float32)
-            self.d2_conv2_gb = np.empty(self.b_conv2.shape, dtype=np.float32)
-            self.d2_fc1_gw = np.empty(self.w_fc1.shape, dtype=np.float32)
-            self.d2_fc1_gb = np.empty(self.b_fc1.shape, dtype=np.float32)
-            self.d2_fc2_gw = np.empty(self.w_fc2.shape, dtype=np.float32)
-            self.d2_fc2_gb = np.empty(self.b_fc2.shape, dtype=np.float32)
             
             # For evaluating
             self.prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(self.y_, 1))
