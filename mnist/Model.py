@@ -51,46 +51,53 @@ class Model:
 
         '''Cost function & optimizer'''
         self.cost = tf.reduce_mean(-tf.reduce_sum(self.y_ * tf.log(self.y), reduction_indices=[1]))
-        #tf.train.AdamOptimizer.__init__(learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-08, use_locking=False, name='Adam')
         self.optimizer = tf.train.AdamOptimizer(1e-4)
-        #tf.train.Optimizer.minimize(loss, global_step=None, var_list=None, gate_gradients=1, aggregation_method=None, colocate_gradients_with_ops=False, name=None, grad_loss=None)
         self.train_step = self.optimizer.minimize(self.cost)
-
+        
+        '''
+        self.layer = [self.w_conv1, self.b_conv1,
+                self.w_conv2, self.b_conv2,
+                self.w_fc1, self.b_fc1,
+                self.w_fc2, self.b_fc2]
+        '''
         # Gradients
-        #tf.train.Optimizer.compute_gradients(loss, var_list=None, gate_gradients=1, aggregation_method=None, colocate_gradients_with_ops=False, grad_loss=None)
         self.grads = self.optimizer.compute_gradients(self.cost,
                         [self.w_conv1, self.b_conv1,
                         self.w_conv2, self.b_conv2,
                         self.w_fc1, self.b_fc1,
                         self.w_fc2, self.b_fc2])
+        self.grads_and_vars = self.optimizer.apply_gradients(self.grads)
+        
         # Data1
-        self.d1_conv1_gw = np.empty((5,5,1,32), dtype=np.float32)
-        self.d1_conv1_gb = np.empty(32, dtype=np.float32)
-        self.d1_conv2_gw = np.empty((5,5,32,64), dtype=np.float32)
-        self.d1_conv2_gb = np.empty(64, dtype=np.float32)
-        self.d1_fc1_gw = np.empty((7*7*64,1024), dtype=np.float32)
-        self.d1_fc1_gb = np.empty(1024, dtype=np.float32)
-        self.d1_fc2_gw = np.empty((1024,10), dtype=np.float32)
-        self.d1_fc2_gb = np.empty(10, dtype=np.float32)
-        # Data2
-        self.d2_conv1_gw = np.empty((5,5,1,32), dtype=np.float32)
-        self.d2_conv1_gb = np.empty(32, dtype=np.float32)
-        self.d2_conv2_gw = np.empty((5,5,32,64), dtype=np.float32)
-        self.d2_conv2_gb = np.empty(64, dtype=np.float32)
-        self.d2_fc1_gw = np.empty((7*7*64,1024), dtype=np.float32)
-        self.d2_fc1_gb = np.empty(1024, dtype=np.float32)
-        self.d2_fc2_gw = np.empty((1024,10), dtype=np.float32)
-        self.d2_fc2_gb = np.empty(10, dtype=np.float32)
-        # Broadcasting values
-        self.bcast_conv1_w = np.empty((5,5,1,32), dtype=np.float32)
-        self.bcast_conv1_b = np.empty(32, dtype=np.float32)
-        self.bcast_conv2_w = np.empty((5,5,32,64), dtype=np.float32)
-        self.bcast_conv2_b = np.empty(64, dtype=np.float32)
-        self.bcast_fc1_w = np.empty((7*7*64,1024), dtype=np.float32)
-        self.bcast_fc1_b = np.empty(1024, dtype=np.float32)
-        self.bcast_fc2_w = np.empty((1024,10), dtype=np.float32)
-        self.bcast_fc2_b = np.empty(10, dtype=np.float32)
+        self.d1_conv1_gw = np.empty(self.w_conv1.shape, dtype=np.float32)
+        self.d1_conv1_gb = np.empty(self.b_conv1.shape, dtype=np.float32)
+        self.d1_conv2_gw = np.empty(self.w_conv2.shape, dtype=np.float32)
+        self.d1_conv2_gb = np.empty(self.b_conv2.shape, dtype=np.float32)
+        self.d1_fc1_gw = np.empty(self.w_fc1.shape, dtype=np.float32)
+        self.d1_fc1_gb = np.empty(self.b_fc1.shape, dtype=np.float32)
+        self.d1_fc2_gw = np.empty(self.w_fc2.shape, dtype=np.float32)
+        self.d1_fc2_gb = np.empty(self.b_fc2.shape, dtype=np.float32)
 
+        # Data2
+        self.d2_conv1_gw = np.empty(self.w_conv1.shape, dtype=np.float32)
+        self.d2_conv1_gb = np.empty(self.b_conv1.shape, dtype=np.float32)
+        self.d2_conv2_gw = np.empty(self.w_conv2.shape, dtype=np.float32)
+        self.d2_conv2_gb = np.empty(self.b_conv2.shape, dtype=np.float32)
+        self.d2_fc1_gw = np.empty(self.w_fc1.shape, dtype=np.float32)
+        self.d2_fc1_gb = np.empty(self.b_fc1.shape, dtype=np.float32)
+        self.d2_fc2_gw = np.empty(self.w_fc2.shape, dtype=np.float32)
+        self.d2_fc2_gb = np.empty(self.b_fc2.shape, dtype=np.float32)
+
+        # Broadcasting values
+        self.bcast_conv1_w = np.empty(self.w_conv1.shape, dtype=np.float32)
+        self.bcast_conv1_b = np.empty(self.b_conv1.shape, dtype=np.float32)
+        self.bcast_conv2_w = np.empty(self.w_conv2.shape, dtype=np.float32)
+        self.bcast_conv2_b = np.empty(self.b_conv2.shape, dtype=np.float32)
+        self.bcast_fc1_w = np.empty(self.w_fc1.shape, dtype=np.float32)
+        self.bcast_fc1_b = np.empty(self.b_fc1.shape, dtype=np.float32)
+        self.bcast_fc2_w = np.empty(self.w_fc2.shape, dtype=np.float32)
+        self.bcast_fc2_b = np.empty(self.b_fc2.shape, dtype=np.float32)
+        
         # For evaluating
         self.prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(self.y_, 1))
         self.accuracy = tf.reduce_mean(tf.cast(self.prediction, tf.float32))
