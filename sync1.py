@@ -13,7 +13,6 @@ class SyncWorker(Model):
         self.comm = comm
         self.rank = rank
         self.batch_size = batch_size
-        self.temp = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
 
     def work(self) -> List:
         x_batch, y_batch = self.data.train.next_batch(self.batch_size)
@@ -29,10 +28,6 @@ class SyncWorker(Model):
         # Data: [gw_conv1, gb_conv1, gw_conv2, gb_conv2, gw_fc1, gb_fc1, gw_fc2, gb_fc2]
         # Send data to parameter server
         return grads
-        
-    def apply(self):
-        for i in range(8):
-            self.layer[i] = self.temp[i]
             
 class ParameterServer(Model):
     def __init__(self, comm, rank):
@@ -70,10 +65,6 @@ if __name__ == "__main__":
     
     if rank == 0:
         start = time.time()
-    if rank == 1:
-        w1.apply()
-    elif rank == 2:
-        w2.apply()
 
     # Measure time
     for step in range(training_time):
@@ -98,12 +89,7 @@ if __name__ == "__main__":
         # Receive data from parameter server
         for i in range(8):
             comm.Bcast([vars[i], MPI.DOUBLE], root = 0)
-        
-        if rank == 1:
-            w1.apply()
-        elif rank == 2:
-            w2.apply()
-        
+       
     if rank == 0:
         end = time.time()
         print('time : %0.2f'%(end - start))
@@ -113,4 +99,3 @@ if __name__ == "__main__":
     
     elif rank == 2:
         print("step : ", step, w2.sess.run(w2.accuracy, feed_dict={w2.x: w2.test_x, w2.y_: w2.test_y_, w2.keep_prob: 1.0}))
-    
