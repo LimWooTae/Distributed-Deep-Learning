@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf
 import time
 from worker import SyncWorker
+
 tf.disable_v2_behavior()
             
 class ParameterServer(Model):
@@ -13,17 +14,54 @@ class ParameterServer(Model):
         super().__init__()
         self.comm = comm
         self.rank = rank
+
+
+
+class ParameterServer():
+    def __init__(self):
+        self.var_size = 8
+        self.var_shape = [
+            [5,5,1,32],
+            [32],
+            [5,5,32,64],
+            [64],
+            [7*7*64, 1024],
+            [1024],
+            [1024, 10],
+            [10]
+        ]
+        
+        # worker1
+        self.g1 = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
+        # worker2
+        self.g2 = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
+        # worker1 + worker2
+        self.g = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
+        
+        with tf.variable_scope("ParameterServer", reuse=tf.AUTO_REUSE):
+            self.var_bucket = [tf.compat.v1.get_variable("v{}".format(i), shape=self.var_shape[i], dtype=tf.float32) for i in range(self.var_size)]
+        
+        
+        self.optimizer = tf.train.AdamOptimizer(1e-4)
+        
+        self.sess = tf.Session()
+        self.sess.run(tf.global_variables_initializer())
+>>>>>>> a12e5a51808bb8a40983e97f9796c96f028c0798
         
     def sync(self) -> List:
         # Receive data from workers
         for i in range(8):
-            comm.Recv([self.d1[i], MPI.DOUBLE], source=1, tag=i+1)
+            comm.Recv([self.g1[i], MPI.DOUBLE], source=1, tag=i+1)
         
         for i in range(8):
-            comm.Recv([self.d2[i], MPI.DOUBLE], source=2, tag=i+1)
+            comm.Recv([self.g2[i], MPI.DOUBLE], source=2, tag=i+1)
         
         for i in range(8):
+<<<<<<< HEAD
             self.layer[i] = (self.d1[i] + self.d2[i])/2
+=======
+            self.g[i] = (self.g1[i] + self.g2[i])/2
+>>>>>>> a12e5a51808bb8a40983e97f9796c96f028c0798
         
         return self.layer
 
@@ -64,13 +102,13 @@ if __name__ == "__main__":
             # Send worker 2's grads
             for i in range(8):
                 comm.Send([grads_w2[i], MPI.DOUBLE], dest=0, tag=i+1)
+            
     
         
         # Receive data from parameter server
         for i in range(8):
             comm.Bcast([var[i], MPI.DOUBLE], root = 0)
-            #if rank==1:
-                #w1.compute_gradients(var[i],
+    
     end = time.time()
     if rank == 0:
         print('prameter time : %0.2f'%(end - start))
