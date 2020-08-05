@@ -8,27 +8,51 @@ import time
 from worker import SyncWorker
 
 
-class ParameterServer(Model):
-    def __init__(self, comm, rank):
-        super().__init__()
-        self.comm = comm
-        self.rank = rank
+class ParameterServer():
+    def __init__(self):
+        self.var_size = 8
+        self.var_shape = [
+            [5,5,1,32],
+            [32],
+            [5,5,32,64],
+            [64],
+            [7*7*64, 1024],
+            [1024],
+            [1024, 10],
+            [10]
+        ]
+        
+        # worker1
+        self.g1 = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
+        # worker2
+        self.g2 = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
+        # worker1 + worker2
+        self.g = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
+        
+        with tf.variable_scope("ParameterServer", reuse=tf.AUTO_REUSE):
+            self.var_bucket = [tf.compat.v1.get_variable("v{}".format(i), shape=self.var_shape[i], dtype=tf.float32) for i in range(self.var_size)]
+        
+        
+        self.optimizer = tf.train.AdamOptimizer(1e-4)
+        
+        self.sess = tf.Session()
+        self.sess.run(tf.global_variables_initializer())
         
     def sync(self) -> List:
         # Receive data from workers
         for i in range(8):
-            comm.Recv([self.d1[i], MPI.DOUBLE], source=1, tag=i+1)
+            comm.Recv([self.g1[i], MPI.DOUBLE], source=1, tag=i+1)
         
         for i in range(8):
-            comm.Recv([self.d2[i], MPI.DOUBLE], source=2, tag=i+1)
+            comm.Recv([self.g2[i], MPI.DOUBLE], source=2, tag=i+1)
         
         for i in range(8):
-            self.layer[i] = (self.d1[i] + self.d2[i])/2
+            self.g[i] = (self.g1[i] + self.g2[i])/2
         
         return self.layer
 
 if __name__ == "__main__":
-    training_time = 200
+    training_time = 100
     batch_size = 128
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -53,18 +77,18 @@ if __name__ == "__main__":
         
         # Worker1
         elif rank == 1:
-            grads_w1 = w1.work(step)
+            grads_w1 = w1.work()
             # Send worker 1's grads
             for i in range(8):
                 comm.Send([grads_w1[i], MPI.DOUBLE], dest=0, tag=i+1)
-            w1.apply(var)
+            
         # Worker2
         else:
-            grads_w2 = w2.work(step)
+            grads_w2 = w2.work()
             # Send worker 2's grads
             for i in range(8):
                 comm.Send([grads_w2[i], MPI.DOUBLE], dest=0, tag=i+1)
-            w2.apply(var)
+            
     
         
         # Receive data from parameter server
