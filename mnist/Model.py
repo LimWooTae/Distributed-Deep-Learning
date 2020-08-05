@@ -71,7 +71,8 @@ class Model:
             # Gradients
             self.grads = self.optimizer.compute_gradients(self.cost, self.layer)
             self.grads_and_vars = self.optimizer.apply_gradients(self.grads)
-            
+            #self.vars = [np.ones(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
+            self.vars = [tf.get_variable("v{}".format(i), shape=self.var_shape[i], dtype=tf.float32) for i in range(self.var_size)]
             # Data1
             self.d1 = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
     
@@ -89,3 +90,10 @@ class Model:
 
             # Initialize variables
             self.sess.run(tf.global_variables_initializer())
+
+    def compute_gradients(self, x, y):
+        return self.sess.run([grad[0] for grad in self.grads],
+                             feed_dict={self.x: x,
+                                        self.y_: y,
+                                        self.keep_prob: 0.5})
+                             
