@@ -17,7 +17,7 @@ class SyncWorker(Model):
         
         # ret -> ((gw, w), (gb, b))
         grads = [grad for grad, var in ret]
-        #self.sess.run(self.grads_and_vars, feed_dict={self.x: x_batch, self.y_: y_batch, self.keep_prob: 0.5})
+        self.sess.run(self.grads_and_vars, feed_dict={self.x: x_batch, self.y_: y_batch, self.keep_prob: 0.5})
         
         # Tuple: (gradient, variable)
         # Pack gradeint values
