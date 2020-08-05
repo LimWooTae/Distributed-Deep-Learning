@@ -66,7 +66,7 @@ if __name__ == "__main__":
             # Send worker 2's grads
             for i in range(8):
                 comm.Send([grads_w2[i], MPI.DOUBLE], dest=0, tag=i+1)
-    
+   
         # Receive data from parameter server
         for i in range(8):
             comm.Bcast([vars[i], MPI.DOUBLE], root = 0)
