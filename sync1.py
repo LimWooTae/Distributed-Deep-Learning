@@ -5,44 +5,9 @@ from mpi4py import MPI
 import numpy as np
 import tensorflow.compat.v1 as tf
 import time
-tf.disable_v2_behavior()
+from worker import SyncWorker
 
-class SyncWorker(Model):
-    def __init__(self, comm, rank, batch_size):
-        super().__init__()
-        self.comm = comm
-        self.rank = rank
-        self.batch_size = batch_size
-        # 코스트, 레이어
-        self.grads_and_vars = self.optimizer.apply_gradients(self.grads)
-        
-        # 파라미터그라디언트, 레이어
-        self.gradsnvars = [(self.vars[i], self.layer[i]) for i in range(self.var_size)]
-        self.grads_and_vars1 = self.optimizer.apply_gradients(self.gradsnvars)
-    
-    def work(self,iter) -> List:
-        x_batch, y_batch = self.data.train.next_batch(self.batch_size)
-        # Compute gradient values
-        ret, = self.sess.run([self.grads], feed_dict={self.x: x_batch, self.y_: y_batch, self.keep_prob: 0.5})
-        
-        
-        # ret -> ((gw, w), (gb, b))
-        grads = [grad for grad, var in ret]
-        
-        self.sess.run(self.grads_and_vars, feed_dict={self.x: x_batch, self.y_: y_batch, self.keep_prob: 0.5})
-        #self.sess.run(self.grads_and_vars1, feed_dict={self.x: x_batch, self.y_: y_batch, self.keep_prob: 0.5})
-        
-        # Tuple: (gradient, variable)
-        # Pack gradeint values
-        # Data: [gw_conv1, gb_conv1, gw_conv2, gb_conv2, gw_fc1, gb_fc1, gw_fc2, gb_fc2]
-        # Send data to parameter server
-        return grads
-        
-    def apply(self, var):
-        for i in range(8):
-            self.vars[i] = var[i]
-            self.layer[i] = var[i]
-            
+
 class ParameterServer(Model):
     def __init__(self, comm, rank):
         super().__init__()
