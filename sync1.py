@@ -7,8 +7,7 @@ import tensorflow.compat.v1 as tf
 import time
 from worker import SyncWorker
 
-
-class ParameterServer():
+class ParameterServer:
     def __init__(self):
         self.var_size = 8
         self.var_shape = [
@@ -21,89 +20,143 @@ class ParameterServer():
             [1024, 10],
             [10]
         ]
-        
-        # worker1
-        self.g1 = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
-        # worker2
-        self.g2 = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
-        # worker1 + worker2
-        self.g = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
-        
+
+        # Data for worker
+        # For worker1
+        self.w1_bucket = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
+
+        # For worker2
+        self.w2_bucket = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
+
+        # For worker1 + worker2
+        self.w_bucket = [np.empty(self.var_shape[i], dtype=np.float32) for i in range(self.var_size)]
+    
+        # TF variables
         with tf.variable_scope("ParameterServer", reuse=tf.AUTO_REUSE):
-            self.var_bucket = [tf.compat.v1.get_variable("v{}".format(i), shape=self.var_shape[i], dtype=tf.float32) for i in range(self.var_size)]
-        
-        
+            self.var_bucket = [tf.get_variable("v{}".format(i), shape=self.var_shape[i], dtype=tf.float32) for i in range(self.var_size)]
+
+        # Optimizer
         self.optimizer = tf.train.AdamOptimizer(1e-4)
-        
+
+        # Apply gradients
+        # Tuple: (gradient, variable)
+        # Pack gradeint values
+        self.grads_and_vars = [(self.w_bucket[i], self.var_bucket[i]) for i in range(self.var_size)]
+        self.sync_gradients = self.optimizer.apply_gradients(self.grads_and_vars)
+            
+        # Create session
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
-        
-    def sync(self) -> List:
-        # Receive data from workers
-        for i in range(8):
-            comm.Recv([self.g1[i], MPI.DOUBLE], source=1, tag=i+1)
-        
-        for i in range(8):
-            comm.Recv([self.g2[i], MPI.DOUBLE], source=2, tag=i+1)
-        
-        for i in range(8):
-            self.g[i] = (self.g1[i] + self.g2[i])/2
-        
-        return self.layer
+
+    def update(self):
+        for i in range(self.var_size):
+            self.w_bucket[i] = self.w1_bucket[i] + self.w2_bucket[i]
+
+        self.grads_and_vars = [(self.w_bucket[i], self.var_bucket[i]) for i in range(self.var_size)]
+        self.sess.run(self.sync_gradients)
+
 
 if __name__ == "__main__":
-    training_time = 100
-    batch_size = 128
+    epoch = 10
+    batch_size = 50
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
-    if rank == 0:
-        ps = ParameterServer(comm, rank)
+    
+    # Worker1
     if rank == 1:
-        w1 = SyncWorker(comm, rank, batch_size)
-    if rank == 2:
-        w2 = SyncWorker(comm, rank, batch_size)
-    
-    p = Model()
-    # Broadcast variable
-    var = [np.empty(p.var_shape[i], dtype=np.float32) for i in range(p.var_size)]
-    
-    start = time.time()
+        start = time.time()
 
-    # Measure time
-    for step in range(training_time):
-        # Parameter Server
-        if rank == 0:
-            var = ps.sync()
-        
-        # Worker1
-        elif rank == 1:
-            grads_w1 = w1.work()
-            # Send worker 1's grads
-            for i in range(8):
-                comm.Send([grads_w1[i], MPI.DOUBLE], dest=0, tag=i+1)
+        w1 = SyncWorker(batch_size)
+        # For broadcasting
+        #bucket = [np.empty(w1.var_shape[i], dtype=np.float32) for i in range(w1.var_size)]
+        bucket = [tf.placeholder(tf.float32, shape = w1.var_shape[i]) for i in range(w1.var_size)]
+        recv = [np.empty(w1.var_shape[i], dtype=np.float32) for i in range(w1.var_size)]
+        with tf.variable_scope("mnist", reuse=tf.AUTO_REUSE):
+            var_bucket = [tf.get_variable("v{}".format(i), shape=w1.var_shape[i], dtype=tf.float32) for i in range(w1.var_size)]
+            bucket_assign = [tf.assign(var_bucket[i], bucket[i]) for i in range(w1.var_size)]
             
-        # Worker2
-        else:
-            grads_w2 = w2.work()
-            # Send worker 2's grads
-            for i in range(8):
-                comm.Send([grads_w2[i], MPI.DOUBLE], dest=0, tag=i+1)
+            for step in range(epoch):
+                grads_w1 = w1.work()
+                # Send worker 1's grads
+                for i in range(w1.var_size):
+                    comm.Send([grads_w1[i], MPI.FLOAT], dest=0, tag=i+1)
+
+                # Receive data from parameter server
+                for i in range(w1.var_size):
+                    #comm.Bcast([bucket[i], MPI.FLOAT], root=0)
+                    comm.Bcast([recv[i], MPI.FLOAT], root=0)
+                # Assign broadcasted values
+
+                # Problem section: duplicate tensor graph
+                #bucket_assign = [tf.assign(var_bucket[i], bucket[i]) for i in range(w1.var_size)]
+                
+                w1.sess.run(bucket_assign, feed_dict = {bucket : recv})
+                
             
-    
-        
-        # Receive data from parameter server
-        for i in range(8):
-            comm.Bcast([var[i], MPI.DOUBLE], root = 0)
-        
-    end = time.time()
-    if rank == 0:
-        print('prameter time : %0.2f'%(end - start))
-    
-    elif rank == 1:
-        w1.sess.run
-        print('worker1 time : %0.2f'%(end - start))
-        print("step : ", step, w1.sess.run(w1.accuracy, feed_dict={w1.x: w1.test_x, w1.y_: w1.test_y_, w1.keep_prob: 1.0}))
-    
+            end = time.time()
+            print("Worker{} Accuracy: {}".format(rank,w1.sess.run(w1.accuracy, feed_dict={w1.x: w1.test_x, w1.y_: w1.test_y_, w1.keep_prob: 1.0})))
+            print("Time: {}".format(end-start))
+     
+
+    # Worker2
     elif rank == 2:
-        print('worker2 time : %0.2f'%(end - start))
-        print("step : ", step, w2.sess.run(w2.accuracy, feed_dict={w2.x: w2.test_x, w2.y_: w2.test_y_, w2.keep_prob: 1.0}))
+        start = time.time()
+
+        w2 = SyncWorker(batch_size)
+        # For broadcasting
+        #bucket = [np.empty(w2.var_shape[i], dtype=np.float32) for i in range(w2.var_size)]
+        bucket = [tf.placeholder(tf.float32, shape = w2.var_shape[i]) for i in range(w2.var_size)]
+        recv = [np.empty(w2.var_shape[i], dtype=np.float32) for i in range(w2.var_size)]
+        with tf.variable_scope("mnist", reuse=tf.AUTO_REUSE):
+            var_bucket = [tf.get_variable("v{}".format(i), shape=w2.var_shape[i], dtype=tf.float32) for i in range(w2.var_size)]
+            bucket_assign = [tf.assign(var_bucket[i], bucket[i]) for i in range(w2.var_size)]
+            
+            for step in range(epoch):
+                grads_w2 = w2.work()
+                
+                # Send worker 1's grads
+                for i in range(w2.var_size):
+                    comm.Send([grads_w2[i], MPI.FLOAT], dest=0, tag=i+1)
+
+                # Receive data from parameter server
+                for i in range(w2.var_size):
+                    #comm.Bcast([bucket[i], MPI.FLOAT], root=0)
+                    comm.Bcast([recv[i], MPI.FLOAT], root=0)
+
+                # Assign broadcasted values
+
+                # Problem section: duplicate tensor graph
+                #bucket_assign = [tf.assign(var_bucket[i], bucket[i]) for i in range(w2.var_size)]
+                    
+                w2.sess.run(bucket_assign, feed_dict = {bucket: recv})
+                
+            end = time.time()
+            print("Worker{} Accuracy: {}".format(rank,w2.sess.run(w2.accuracy, feed_dict={w2.x: w2.test_x, w2.y_: w2.test_y_, w2.keep_prob: 1.0})))
+            print("Time: {}".format(end-start))
+
+    # Parameter Server
+    else:
+        ps = ParameterServer()
+        # For broadcasting
+        bucket = [np.empty(ps.var_shape[i], dtype=np.float32) for i in range(ps.var_size)]
+
+        for step in range(epoch):
+            # Receive data from workers
+            # From worker1
+            for i in range(ps.var_size):
+                comm.Recv([ps.w1_bucket[i], MPI.FLOAT], source=1, tag=i+1)
+
+            # From worker2
+            for i in range(ps.var_size):
+                comm.Recv([ps.w2_bucket[i], MPI.FLOAT], source=2, tag=i+1)
+
+            # Synchronize
+            ps.update()
+
+            # Broadcast values
+            for i in range(ps.var_size):
+                bucket[i] = ps.var_bucket[i].eval(session=ps.sess)
+
+            # send to worker 1, 2
+            for i in range(ps.var_size):
+                comm.Bcast([bucket[i], MPI.FLOAT], root=0)
